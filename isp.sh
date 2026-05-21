@@ -32,17 +32,20 @@ systemctl enable --now chronyd
 echo "[3/7] Настройка сетевого интерфейса ens19 (LAN)..."
 mkdir -p /etc/net/ifaces/ens19
 
+# Файл options (тип интерфейса, способ получения адреса)
 cat > /etc/net/ifaces/ens19/options << 'EOF'
 TYPE=eth
 BOOTPROTO=static
-IPADDR=10.0.0.1
-NETMASK=255.255.255.0
 ONBOOT=yes
 EOF
 
-# Внешний интерфейс ens18 оставляем как есть (DHCP)
-systemctl restart network
+# Файл ipv4address (сам IP-адрес и маска)
+cat > /etc/net/ifaces/ens19/ipv4address << 'EOF'
+10.0.0.1/24
+EOF
 
+# Внешний интерфейс ens18 остаётся как есть (DHCP)
+systemctl restart network
 # ----------------------------------------------------------
 # 4. Включение IP-форвардинга
 # ----------------------------------------------------------

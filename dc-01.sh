@@ -1,9 +1,8 @@
 #!/bin/bash
 # ============================================================
-# SRV-DC-01 — КОНТРОЛЛЕР ДОМЕНА
+# SRV-DC-01 — КОНТРОЛЛЕР ДОМЕНА (РАБОЧИЙ)
 # ОС: ALT Server 10
-# IP: 10.0.10.10/24
-# Шлюз: 10.0.10.1
+# IP: 10.0.10.10/24, шлюз: 10.0.10.1
 # Домен: br67core.local
 # Пароль администратора: P@ssw0rd!
 # ============================================================
@@ -18,14 +17,14 @@ echo "========================================="
 # ----------------------------------------------------------
 # 1. Обновление и пакеты
 # ----------------------------------------------------------
-echo "[1/7] Обновление и установка пакетов..."
+echo "[1/6] Обновление и установка пакетов..."
 apt-get update && apt-get dist-upgrade -y
 apt-get install -y task-samba-dc dhcp-server chrony net-tools openssh-server
 
 # ----------------------------------------------------------
 # 2. Сеть
 # ----------------------------------------------------------
-echo "[2/7] Настройка сети..."
+echo "[2/6] Настройка сети..."
 mkdir -p /etc/net/ifaces/ens18
 
 cat > /etc/net/ifaces/ens18/options << 'EOF'
@@ -45,19 +44,20 @@ systemctl restart network
 
 echo ""
 echo "=== Проверка связи с GW-01 ==="
-ping -c 2 10.0.10.1 && echo "GW-01 доступен" || echo "Нет связи с GW-01"
+ping -c 2 10.0.10.1
 
 # ----------------------------------------------------------
-# 3. Синхронизация времени
+# 3. Время
 # ----------------------------------------------------------
-echo "[3/7] Настройка времени..."
+echo "[3/6] Настройка времени..."
 systemctl enable --now chronyd
-chronyc makestep
+sleep 2
+chronyc makestep || true
 
 # ----------------------------------------------------------
 # 4. Развёртывание домена
 # ----------------------------------------------------------
-echo "[4/7] Развёртывание Samba AD DC..."
+echo "[4/6] Развёртывание Samba AD DC..."
 
 rm -f /etc/samba/smb.conf
 rm -rf /var/lib/samba/private/*
@@ -71,18 +71,13 @@ samba-tool domain provision \
     --dns-backend=SAMBA_INTERNAL \
     --host-name=srv-dc-01
 
+cp /var/lib/samba/private/krb5.conf /etc/krb5.conf
+
 # ----------------------------------------------------------
 # 5. Запуск Samba
 # ----------------------------------------------------------
-echo "[5/7] Запуск Samba..."
-
-cp /var/lib/samba/private/krb5.conf /etc/krb5.conf
-
+echo "[5/6] Запуск Samba..."
 systemctl enable --now samba
-
-# DNS forwarders (исправленный синтаксис)
-samba-tool dns zoneoptions 127.0.0.1 br67core.local --option="forwarder=8.8.8.8"
-samba-tool dns zoneoptions 127.0.0.1 br67core.local --option="forwarder=77.88.8.8"
 
 echo ""
 echo "=== Проверка домена ==="
@@ -91,7 +86,7 @@ samba-tool domain level show
 # ----------------------------------------------------------
 # 6. DHCP
 # ----------------------------------------------------------
-echo "[6/7] Настройка DHCP-сервера..."
+echo "[6/6] Настройка DHCP..."
 
 cat > /etc/dhcp/dhcpd.conf << 'EOF'
 default-lease-time 86400;
@@ -104,7 +99,6 @@ subnet 10.0.20.0 netmask 255.255.255.0 {
     option subnet-mask 255.255.255.0;
     option domain-name-servers 10.0.10.10;
     option domain-name "br67core.local";
-    option netbios-name-servers 10.0.10.10;
 }
 EOF
 
@@ -115,33 +109,23 @@ EOF
 systemctl enable --now dhcpd
 
 # ----------------------------------------------------------
-# 7. Пользователи
-# ----------------------------------------------------------
-echo "[7/7] Создание тестовых пользователей..."
-
-for user in user1 user2 admin; do
-    samba-tool user create $user "Pass123!" --given-name=$user --surname=Test
-done
-
-# ----------------------------------------------------------
 # Финал
 # ----------------------------------------------------------
 echo ""
 echo "========================================="
-echo "  НАСТРОЙКА SRV-DC-01 ЗАВЕРШЕНА"
+echo "  SRV-DC-01 ГОТОВ"
 echo "========================================="
 echo ""
-echo "Домен: BR67CORE.LOCAL"
-echo "Пароль администратора: P@ssw0rd!"
-echo "Пользователи: user1, user2, admin (Pass123!)"
+echo "Домен:    BR67CORE.LOCAL"
+echo "Пароль:   P@ssw0rd!"
 echo ""
-echo "=== Статусы служб ==="
-echo "Samba:  $(systemctl is-active samba)"
-echo "DHCP:   $(systemctl is-active dhcpd)"
-echo "Chrony: $(systemctl is-active chronyd)"
+echo "Статусы:"
+echo "  Samba:  $(systemctl is-active samba)"
+echo "  DHCP:   $(systemctl is-active dhcpd)"
+echo "  Chrony: $(systemctl is-active chronyd)"
 echo ""
-echo "=== Проверка DNS ==="
+echo "Проверка DNS:"
 host -t A br67core.local 127.0.0.1
 echo ""
-echo "=== Проверка Kerberos ==="
+echo "Kerberos:"
 echo "P@ssw0rd!" | kinit administrator@BR67CORE.LOCAL && klist

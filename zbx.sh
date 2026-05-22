@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================
 # SRV-ZBX-01 — СЕРВЕР МОНИТОРИНГА ZABBIX
-# ОС: Astra Linux 1.8 / ALT Server 10
+# ОС: ALT Server 10 / Astra Linux 1.8
 # IP: 10.0.10.13/24, шлюз: 10.0.10.1
 # ============================================================
 
@@ -14,14 +14,14 @@ echo "========================================="
 # ----------------------------------------------------------
 # 1. Обновление и пакеты
 # ----------------------------------------------------------
-echo "[1/6] Обновление и установка пакетов..."
+echo "[1/7] Обновление и установка пакетов..."
 apt-get update && apt-get dist-upgrade -y
-apt-get install -y postgresql16 postgresql16-server apache2 php php-pgsql zabbix-server-pgsql zabbix-frontend-php zabbix-agent chrony net-tools openssh-server
+apt-get install -y postgresql16 postgresql16-server apache2 php8.2 php8.2-pgsql zabbix-server-pgsql zabbix-frontend-php zabbix-agent chrony net-tools openssh-server
 
 # ----------------------------------------------------------
 # 2. Сеть
 # ----------------------------------------------------------
-echo "[2/6] Настройка сети..."
+echo "[2/7] Настройка сети..."
 mkdir -p /etc/net/ifaces/ens18
 
 cat > /etc/net/ifaces/ens18/options << 'EOF'
@@ -45,7 +45,7 @@ ping -c 2 10.0.10.1
 # ----------------------------------------------------------
 # 3. Время
 # ----------------------------------------------------------
-echo "[3/6] Настройка времени..."
+echo "[3/7] Настройка времени..."
 systemctl enable --now chronyd
 sleep 2
 chronyc makestep || true
@@ -53,23 +53,27 @@ chronyc makestep || true
 # ----------------------------------------------------------
 # 4. PostgreSQL
 # ----------------------------------------------------------
-echo "[4/6] Настройка PostgreSQL..."
+echo "[4/7] Настройка PostgreSQL..."
 
 systemctl enable --now postgresql-16
 
-# Создаём БД и пользователя Zabbix
 su - postgres -c "psql -c \"CREATE USER zabbix WITH PASSWORD 'Zabbix123!';\""
 su - postgres -c "psql -c \"CREATE DATABASE zabbix OWNER zabbix;\""
 
 # ----------------------------------------------------------
-# 5. Zabbix Server
+# 5. PHP в Apache
 # ----------------------------------------------------------
-echo "[5/6] Настройка Zabbix Server..."
+echo "[5/7] Активация PHP в Apache..."
+a2enmod php8.2
+systemctl restart httpd2
 
-# Импортируем схему
+# ----------------------------------------------------------
+# 6. Zabbix Server
+# ----------------------------------------------------------
+echo "[6/7] Настройка Zabbix Server..."
+
 zcat /usr/share/doc/zabbix-server-pgsql-*/create.sql.gz | su - postgres -c "psql zabbix"
 
-# Конфигурация Zabbix
 cat > /etc/zabbix/zabbix_server.conf << 'EOF'
 DBHost=localhost
 DBName=zabbix
@@ -81,11 +85,10 @@ EOF
 systemctl enable --now zabbix-server
 
 # ----------------------------------------------------------
-# 6. Zabbix Agent и веб-интерфейс
+# 7. Zabbix Agent и веб-интерфейс
 # ----------------------------------------------------------
-echo "[6/6] Настройка Zabbix Agent и веб-интерфейса..."
+echo "[7/7] Настройка Zabbix Agent и веб-интерфейса..."
 
-# Настройка агента
 cat > /etc/zabbix/zabbix_agentd.conf << 'EOF'
 Server=127.0.0.1
 ServerActive=127.0.0.1
@@ -94,7 +97,6 @@ EOF
 
 systemctl enable --now zabbix-agent
 
-# Веб-интерфейс
 cat > /etc/httpd2/conf/sites-available/zabbix.conf << 'EOF'
 Alias /zabbix /usr/share/zabbix
 <Directory "/usr/share/zabbix">
@@ -110,7 +112,7 @@ Alias /zabbix /usr/share/zabbix
 EOF
 
 ln -sf /etc/httpd2/conf/sites-available/zabbix.conf /etc/httpd2/conf/sites-enabled/
-systemctl enable --now httpd2
+systemctl restart httpd2
 
 # ----------------------------------------------------------
 # Финал
@@ -121,7 +123,7 @@ echo "  SRV-ZBX-01 ГОТОВ"
 echo "========================================="
 echo ""
 echo "IP: 10.0.10.13"
-echo "Веб-интерфейс: http://10.0.10.13/zabbix"
+echo "Zabbix: http://10.0.10.13/zabbix"
 echo "БД: zabbix / Zabbix123!"
 echo ""
 echo "Статусы:"

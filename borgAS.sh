@@ -13,20 +13,20 @@ echo "========================================="
 echo "[1/3] Обновление репозиториев..."
 apt-get update
 
-# 2. Пробуем установить из репозитория
+# 2. Установка
 echo "[2/3] Установка BorgBackup..."
 if apt-get install -y borgbackup 2>/dev/null; then
     echo "Установлен из пакета borgbackup"
 elif apt-get install -y borg 2>/dev/null; then
     echo "Установлен из пакета borg"
 else
-    echo "Пакет не найден, установка через pip..."
-    apt-get install -y python3 python3-pip python3-dev libssl-dev libacl1-dev liblz4-dev libzstd-dev libxxhash-dev gcc build-essential pkg-config
+    echo "Установка через pip..."
+    apt-get install -y python3 python3-pip python3-dev libssl-dev libacl1-dev liblz4-dev libzstd-dev gcc build-essential pkg-config
     pip3 install borgbackup
 fi
 
 # 3. Проверка
-echo "[3/3] Проверка установки..."
+echo "[3/3] Проверка..."
 borg -V
 
 echo ""

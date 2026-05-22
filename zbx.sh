@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# SRV-ZBX-01 — СЕРВЕР МОНИТОРИНГА ZABBIX (ИСПРАВЛЕННЫЙ)
+# SRV-ZBX-01 — СЕРВЕР МОНИТОРИНГА ZABBIX
 # ОС: ALT Server 10
 # IP: 10.0.10.13/24, шлюз: 10.0.10.1
 # ============================================================
@@ -55,24 +55,28 @@ chronyc makestep || true
 # ----------------------------------------------------------
 echo "[4/7] Настройка PostgreSQL..."
 
-systemctl enable --now postgresql-16
+# Пробуем разные имена службы
+systemctl enable --now postgresql 2>/dev/null || \
+systemctl enable --now postgresql-16 2>/dev/null || \
+systemctl enable --now postgresql16
+
+sleep 3
 
 su - postgres -c "psql -c \"CREATE USER zabbix WITH PASSWORD 'Zabbix123!';\""
 su - postgres -c "psql -c \"CREATE DATABASE zabbix OWNER zabbix;\""
 
 # ----------------------------------------------------------
-# 5. Установка веб-интерфейса Zabbix вручную
+# 5. Веб-интерфейс Zabbix
 # ----------------------------------------------------------
-echo "[5/7] Установка веб-интерфейса Zabbix..."
+echo "[5/7] Установка веб-интерфейса..."
 
-# Качаем исходники Zabbix (нужен только frontend)
 cd /tmp
 wget -q https://cdn.zabbix.com/zabbix/sources/stable/6.0/zabbix-6.0.0.tar.gz
 tar -xzf zabbix-6.0.0.tar.gz
+mkdir -p /usr/share/zabbix
 cp -r zabbix-6.0.0/ui/* /usr/share/zabbix/
 chown -R apache2:apache2 /usr/share/zabbix
 
-# Активация PHP
 a2enmod php8.2
 systemctl restart httpd2
 
@@ -134,9 +138,3 @@ echo ""
 echo "Zabbix: http://10.0.10.13/zabbix"
 echo "БД: zabbix / Zabbix123!"
 echo "Логин: Admin / zabbix"
-echo ""
-echo "Статусы:"
-echo "  PostgreSQL:    $(systemctl is-active postgresql-16)"
-echo "  Zabbix Server: $(systemctl is-active zabbix-server)"
-echo "  Zabbix Agent:  $(systemctl is-active zabbix-agent)"
-echo "  Apache2:       $(systemctl is-active httpd2)"

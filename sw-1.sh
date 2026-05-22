@@ -3,91 +3,80 @@
 # Скрипт полной настройки коммутатора SW-01 (ЯДРО СЕТИ)
 # ОС: ALT Linux 10 (JEOS)
 # Порты:
-#   ens19 -> GW-01
-#   ens20,21 -> Серверный сегмент
-#   ens22,23 -> Пользовательский сегмент
-# Управление: br0 (бридж) -> 10.0.0.2/24
+#   ens19 -> GW-01 (управление + VLAN trunk)
+#   ens20 -> Серверный сегмент (access VLAN 10)
+#   ens21 -> Пользовательский сегмент (access VLAN 20)
+# Управление: IP на ens19 -> 10.0.0.2/24
 # ============================================================
 
 set -e
 
 echo "========================================="
-echo "  НАСТРОЙКА SW-01 (КОММУТАТОР ЯДРА)"
+echo "  НАСТРОЙКА SW-01 (3 порта)"
+echo "  ens19 -> GW-01"
+echo "  ens20 -> Серверы (access VLAN 10)"
+echo "  ens21 -> Пользователи (access VLAN 20)"
 echo "========================================="
 
 # ----------------------------------------------------------
 # 1. Обновление и пакеты
 # ----------------------------------------------------------
-echo "[1/3] Обновление и установка пакетов..."
+echo "[1/4] Обновление и установка пакетов..."
 apt-get update && apt-get dist-upgrade -y
-apt-get install -y bridge-utils net-tools openssh-server chrony
+apt-get install -y openvswitch net-tools openssh-server chrony
 
 # ----------------------------------------------------------
-# 2. Очистка старых настроек (на всякий случай)
+# 2. Настройка ens19 (управление)
 # ----------------------------------------------------------
-echo "[2/3] Очистка старых настроек..."
+echo "[2/4] Настройка ens19 (IP: 10.0.0.2/24)..."
 
-# Останавливаем OVS если был
-systemctl stop openvswitch 2>/dev/null || true
-systemctl disable openvswitch 2>/dev/null || true
+mkdir -p /etc/net/ifaces/ens19
 
-# Удаляем старые конфиги интерфейсов
-rm -rf /etc/net/ifaces/ens19 /etc/net/ifaces/ens20 /etc/net/ifaces/ens21
-rm -rf /etc/net/ifaces/ens22 /etc/net/ifaces/ens23 /etc/net/ifaces/br0
-rm -f /etc/net/ifaces/default/ipv4route
-
-# ----------------------------------------------------------
-# 3. Создание бриджа
-# ----------------------------------------------------------
-echo "[3/3] Создание бриджа br0..."
-
-# Создаём бридж
-ip link add name br0 type bridge
-ip link set br0 up
-
-# Добавляем все порты в бридж
-for port in ens19 ens20 ens21 ens22 ens23; do
-    ip link set $port master br0
-    ip link set $port up
-done
-
-# Назначаем IP на бридже
-ip addr add 10.0.0.2/24 dev br0
-
-# Шлюз
-ip route add default via 10.0.0.1
-
-# ----------------------------------------------------------
-# Сохранение конфигурации
-# ----------------------------------------------------------
-mkdir -p /etc/net/ifaces/br0
-
-cat > /etc/net/ifaces/br0/options << 'EOF'
-TYPE=bridge
-BOOTPROTO=static
-ONBOOT=yes
-EOF
-
-echo '10.0.0.2/24' > /etc/net/ifaces/br0/ipv4address
-
-# Шлюз
-mkdir -p /etc/net/ifaces/default
-echo '10.0.0.1' > /etc/net/ifaces/default/ipv4route
-
-# Настройка портов в бридже
-for port in ens19 ens20 ens21 ens22 ens23; do
-    mkdir -p /etc/net/ifaces/$port
-    echo '10.0.0.2/24' > /etc/net/ifaces/$port/ipv4address 2>/dev/null || true
-    
-    cat > /etc/net/ifaces/$port/options << EOF
+cat > /etc/net/ifaces/ens19/options << 'EOF'
 TYPE=eth
 BOOTPROTO=static
 ONBOOT=yes
-HOST='br0'
 EOF
-done
 
-# Синхронизация времени
+echo '10.0.0.2/24' > /etc/net/ifaces/ens19/ipv4address
+
+mkdir -p /etc/net/ifaces/default
+echo '10.0.0.1' > /etc/net/ifaces/default/ipv4route
+
+systemctl restart network
+
+echo ""
+echo "=== Проверка связи с GW-01 ==="
+ping -c 2 10.0.0.1 && echo "GW-01 доступен" || echo "GW-01 НЕ доступен"
+
+# ----------------------------------------------------------
+# 3. Open vSwitch для VLAN
+# ----------------------------------------------------------
+echo ""
+echo "[3/4] Настройка OVS..."
+
+systemctl enable --now openvswitch
+
+ovs-vsctl add-br SW-BR0
+
+# ens19 как trunk (пропускает оба VLAN)
+ovs-vsctl add-port SW-BR0 ens19 trunks=10,20
+
+# ens20 — access в VLAN 10 (серверы)
+ovs-vsctl add-port SW-BR0 ens20 tag=10
+
+# ens21 — access в VLAN 20 (пользователи)
+ovs-vsctl add-port SW-BR0 ens21 tag=20
+
+# Поднимаем порты
+ip link set ens20 up
+ip link set ens21 up
+ip link set SW-BR0 up
+
+# ----------------------------------------------------------
+# 4. Синхронизация времени
+# ----------------------------------------------------------
+echo "[4/4] Настройка chrony..."
 systemctl enable --now chronyd
 
 # ----------------------------------------------------------
@@ -98,8 +87,11 @@ echo "========================================="
 echo "  НАСТРОЙКА SW-01 ЗАВЕРШЕНА"
 echo "========================================="
 echo ""
-echo "Бридж и порты:"
-ip -br a | grep -E "ens|br0"
+echo "ens19 (управление + trunk):"
+ip -br a | grep ens19
+echo ""
+echo "Конфигурация OVS:"
+ovs-vsctl show
 echo ""
 echo "Маршруты:"
 ip route

@@ -16,7 +16,7 @@ echo "========================================="
 # ----------------------------------------------------------
 echo "[1/6] Обновление и установка пакетов..."
 apt-get update && apt-get dist-upgrade -y
-apt-get install -y postgresql postgresql-server apache2 php php-pgsql zabbix-server-pgsql zabbix-frontend-php zabbix-agent chrony net-tools openssh-server
+apt-get install -y postgresql16 postgresql16-server apache2 php php-pgsql zabbix-server-pgsql zabbix-frontend-php zabbix-agent chrony net-tools openssh-server
 
 # ----------------------------------------------------------
 # 2. Сеть
@@ -55,7 +55,7 @@ chronyc makestep || true
 # ----------------------------------------------------------
 echo "[4/6] Настройка PostgreSQL..."
 
-systemctl enable --now postgresql
+systemctl enable --now postgresql-16
 
 # Создаём БД и пользователя Zabbix
 su - postgres -c "psql -c \"CREATE USER zabbix WITH PASSWORD 'Zabbix123!';\""
@@ -125,7 +125,7 @@ echo "Веб-интерфейс: http://10.0.10.13/zabbix"
 echo "БД: zabbix / Zabbix123!"
 echo ""
 echo "Статусы:"
-echo "  PostgreSQL:  $(systemctl is-active postgresql)"
+echo "  PostgreSQL:    $(systemctl is-active postgresql-16)"
 echo "  Zabbix Server: $(systemctl is-active zabbix-server)"
 echo "  Zabbix Agent:  $(systemctl is-active zabbix-agent)"
 echo "  Apache2:       $(systemctl is-active httpd2)"

@@ -11,47 +11,45 @@ echo "  НАСТРОЙКА ХРАНИЛИЩА SRV-BKP-01"
 echo "========================================="
 
 # ----------------------------------------------------------
-# 1. Установка BorgBackup
+# 1. Установка пакетов
 # ----------------------------------------------------------
-echo "[1/5] Установка BorgBackup..."
+echo "[1/5] Установка пакетов..."
 apt-get update
-apt-get install -y borgbackup openssh-server
+apt-get install -y python3 python3-pip python3-module-pip openssh-server gcc python3-dev libacl-devel openssl-devel lz4-devel zstd-devel libb2-devel
 
 # ----------------------------------------------------------
-# 2. Создание пользователя borgbackup
+# 2. Установка BorgBackup через pip
 # ----------------------------------------------------------
-echo "[2/5] Создание пользователя borgbackup..."
+echo "[2/5] Установка BorgBackup..."
+pip3 install borgbackup
+
+# ----------------------------------------------------------
+# 3. Создание пользователя
+# ----------------------------------------------------------
+echo "[3/5] Создание пользователя borgbackup..."
 useradd -m -s /bin/bash borgbackup
 echo "borgbackup:Backup123!" | chpasswd
 
 # ----------------------------------------------------------
-# 3. Создание каталога репозитория
+# 4. Создание каталога репозитория
 # ----------------------------------------------------------
-echo "[3/5] Создание каталога репозитория..."
+echo "[4/5] Создание каталога репозитория..."
 mkdir -p /srv/borg/repo
 chown -R borgbackup:borgbackup /srv/borg
 chmod 750 /srv/borg
 
-# ----------------------------------------------------------
-# 4. Настройка SSH
-# ----------------------------------------------------------
-echo "[4/5] Настройка SSH..."
+# Настройка SSH
 mkdir -p /home/borgbackup/.ssh
 chmod 700 /home/borgbackup/.ssh
 chown borgbackup:borgbackup /home/borgbackup/.ssh
-
 systemctl enable --now sshd
 
 # ----------------------------------------------------------
 # 5. Инициализация репозитория
 # ----------------------------------------------------------
-echo "[5/5] Инициализация BorgBackup репозитория..."
+echo "[5/5] Инициализация репозитория..."
 
-# Инициализируем репозиторий с шифрованием
-borg init --encryption=repokey-blake2 \
-    /srv/borg/repo
-
-# Экспорт ключа шифрования
+borg init --encryption=repokey-blake2 /srv/borg/repo
 borg key export /srv/borg/repo /root/borg-repokey.txt
 chmod 600 /root/borg-repokey.txt
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================
-# SRV-ZBX-01 — СЕРВЕР МОНИТОРИНГА ZABBIX
-# ОС: ALT Server 10 / Astra Linux 1.8
+# SRV-ZBX-01 — СЕРВЕР МОНИТОРИНГА ZABBIX (ИСПРАВЛЕННЫЙ)
+# ОС: ALT Server 10
 # IP: 10.0.10.13/24, шлюз: 10.0.10.1
 # ============================================================
 
@@ -16,7 +16,7 @@ echo "========================================="
 # ----------------------------------------------------------
 echo "[1/7] Обновление и установка пакетов..."
 apt-get update && apt-get dist-upgrade -y
-apt-get install -y postgresql16 postgresql16-server apache2 php8.2 php8.2-pgsql zabbix-server-pgsql zabbix-frontend-php zabbix-agent chrony net-tools openssh-server
+apt-get install -y postgresql16 postgresql16-server apache2 php8.2 php8.2-pgsql php8.2-mbstring php8.2-xml php8.2-bcmath php8.2-ldap zabbix-server-pgsql zabbix-agent chrony net-tools openssh-server wget tar
 
 # ----------------------------------------------------------
 # 2. Сеть
@@ -61,9 +61,18 @@ su - postgres -c "psql -c \"CREATE USER zabbix WITH PASSWORD 'Zabbix123!';\""
 su - postgres -c "psql -c \"CREATE DATABASE zabbix OWNER zabbix;\""
 
 # ----------------------------------------------------------
-# 5. PHP в Apache
+# 5. Установка веб-интерфейса Zabbix вручную
 # ----------------------------------------------------------
-echo "[5/7] Активация PHP в Apache..."
+echo "[5/7] Установка веб-интерфейса Zabbix..."
+
+# Качаем исходники Zabbix (нужен только frontend)
+cd /tmp
+wget -q https://cdn.zabbix.com/zabbix/sources/stable/6.0/zabbix-6.0.0.tar.gz
+tar -xzf zabbix-6.0.0.tar.gz
+cp -r zabbix-6.0.0/ui/* /usr/share/zabbix/
+chown -R apache2:apache2 /usr/share/zabbix
+
+# Активация PHP
 a2enmod php8.2
 systemctl restart httpd2
 
@@ -85,9 +94,9 @@ EOF
 systemctl enable --now zabbix-server
 
 # ----------------------------------------------------------
-# 7. Zabbix Agent и веб-интерфейс
+# 7. Zabbix Agent и веб-сервер
 # ----------------------------------------------------------
-echo "[7/7] Настройка Zabbix Agent и веб-интерфейса..."
+echo "[7/7] Настройка Zabbix Agent и Apache..."
 
 cat > /etc/zabbix/zabbix_agentd.conf << 'EOF'
 Server=127.0.0.1
@@ -122,9 +131,9 @@ echo "========================================="
 echo "  SRV-ZBX-01 ГОТОВ"
 echo "========================================="
 echo ""
-echo "IP: 10.0.10.13"
 echo "Zabbix: http://10.0.10.13/zabbix"
 echo "БД: zabbix / Zabbix123!"
+echo "Логин: Admin / zabbix"
 echo ""
 echo "Статусы:"
 echo "  PostgreSQL:    $(systemctl is-active postgresql-16)"

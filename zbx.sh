@@ -14,14 +14,14 @@ echo "========================================="
 # ----------------------------------------------------------
 # 1. Обновление и пакеты
 # ----------------------------------------------------------
-echo "[1/7] Обновление и установка пакетов..."
+echo "[1/8] Обновление и установка пакетов..."
 apt-get update && apt-get dist-upgrade -y
 apt-get install -y postgresql16 postgresql16-server apache2 php8.2 php8.2-pgsql php8.2-mbstring php8.2-xml php8.2-bcmath php8.2-ldap zabbix-server-pgsql zabbix-agent chrony net-tools openssh-server wget tar
 
 # ----------------------------------------------------------
 # 2. Сеть
 # ----------------------------------------------------------
-echo "[2/7] Настройка сети..."
+echo "[2/8] Настройка сети..."
 mkdir -p /etc/net/ifaces/ens18
 
 cat > /etc/net/ifaces/ens18/options << 'EOF'
@@ -45,26 +45,46 @@ ping -c 2 10.0.10.1
 # ----------------------------------------------------------
 # 3. Время
 # ----------------------------------------------------------
-echo "[3/7] Настройка времени..."
+echo "[3/8] Настройка времени..."
 systemctl enable --now chronyd
 sleep 2
 chronyc makestep || true
 
 # ----------------------------------------------------------
-# 4. PostgreSQL
+# 4. Инициализация PostgreSQL
 # ----------------------------------------------------------
-echo "[4/7] Настройка PostgreSQL..."
+echo "[4/8] Инициализация PostgreSQL..."
 
+# Инициализируем кластер
+postgresql-16-setup initdb || su - postgres -c "initdb -D /var/lib/pgsql/data" || true
+
+# Запускаем
 systemctl enable --now postgresql
 sleep 3
+
+# Проверка
+if ! systemctl is-active --quiet postgresql; then
+    echo "ОШИБКА: PostgreSQL не запустился"
+    systemctl status postgresql
+    exit 1
+fi
+
+echo "PostgreSQL запущен"
+
+# ----------------------------------------------------------
+# 5. Создание БД Zabbix
+# ----------------------------------------------------------
+echo "[5/8] Создание базы данных Zabbix..."
 
 su - postgres -c "psql -c \"CREATE USER zabbix WITH PASSWORD 'Zabbix123!';\""
 su - postgres -c "psql -c \"CREATE DATABASE zabbix OWNER zabbix;\""
 
+echo "База данных создана"
+
 # ----------------------------------------------------------
-# 5. Веб-интерфейс Zabbix
+# 6. Веб-интерфейс Zabbix
 # ----------------------------------------------------------
-echo "[5/7] Установка веб-интерфейса..."
+echo "[6/8] Установка веб-интерфейса..."
 
 cd /tmp
 wget -q https://cdn.zabbix.com/zabbix/sources/stable/6.0/zabbix-6.0.0.tar.gz
@@ -77,9 +97,9 @@ a2enmod php8.2
 systemctl restart httpd2
 
 # ----------------------------------------------------------
-# 6. Zabbix Server
+# 7. Zabbix Server
 # ----------------------------------------------------------
-echo "[6/7] Настройка Zabbix Server..."
+echo "[7/8] Настройка Zabbix Server..."
 
 zcat /usr/share/doc/zabbix-server-pgsql-*/create.sql.gz | su - postgres -c "psql zabbix"
 
@@ -94,9 +114,9 @@ EOF
 systemctl enable --now zabbix-server
 
 # ----------------------------------------------------------
-# 7. Zabbix Agent и веб-сервер
+# 8. Zabbix Agent и Apache
 # ----------------------------------------------------------
-echo "[7/7] Настройка Zabbix Agent и Apache..."
+echo "[8/8] Настройка Zabbix Agent..."
 
 cat > /etc/zabbix/zabbix_agentd.conf << 'EOF'
 Server=127.0.0.1

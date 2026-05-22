@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# SRV-ZBX-01 — СЕРВЕР МОНИТОРИНГА ZABBIX
+# SRV-ZBX-01 — СЕРВЕР МОНИТОРИНГА ZABBIX (ФИНАЛЬНЫЙ)
 # ОС: ALT Server 10
 # IP: 10.0.10.13/24, шлюз: 10.0.10.1
 # ============================================================
@@ -55,11 +55,7 @@ chronyc makestep || true
 # ----------------------------------------------------------
 echo "[4/7] Настройка PostgreSQL..."
 
-# Пробуем разные имена службы
-systemctl enable --now postgresql 2>/dev/null || \
-systemctl enable --now postgresql-16 2>/dev/null || \
-systemctl enable --now postgresql16
-
+systemctl enable --now postgresql
 sleep 3
 
 su - postgres -c "psql -c \"CREATE USER zabbix WITH PASSWORD 'Zabbix123!';\""
@@ -138,3 +134,9 @@ echo ""
 echo "Zabbix: http://10.0.10.13/zabbix"
 echo "БД: zabbix / Zabbix123!"
 echo "Логин: Admin / zabbix"
+echo ""
+echo "Статусы:"
+echo "  PostgreSQL:    $(systemctl is-active postgresql)"
+echo "  Zabbix Server: $(systemctl is-active zabbix-server)"
+echo "  Zabbix Agent:  $(systemctl is-active zabbix-agent)"
+echo "  Apache2:       $(systemctl is-active httpd2)"

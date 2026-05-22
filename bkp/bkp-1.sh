@@ -10,30 +10,29 @@ echo "  НАСТРОЙКА ХРАНИЛИЩА SRV-BKP-01"
 echo "========================================="
 
 # ----------------------------------------------------------
-# 1. Установка пакетов
+# 1. Установка зависимостей
 # ----------------------------------------------------------
-echo "[1/5] Установка пакетов..."
+echo "[1/5] Установка зависимостей..."
 apt-get update
-apt-get install -y python3 openssh-server gcc python3-dev libacl-devel openssl-devel lz4-devel zstd-devel libb2-devel wget
-
-# Установка pip (если нет в репозитории)
-if ! command -v pip3 &> /dev/null; then
-    apt-get install -y python3-module-pip 2>/dev/null || {
-        wget -q https://bootstrap.pypa.io/get-pip.py
-        python3 get-pip.py
-    }
-fi
+apt-get install -y python3-module-pkgconfig python3-module-setuptools \
+    python3-module-wheel python3-module-msgpack libssl-devel python3-dev \
+    libacl-devel libacl liblz4-devel libzstd-devel libxxhash-devel \
+    openssh-server
 
 # ----------------------------------------------------------
-# 2. Установка BorgBackup
+# 2. Установка BorgBackup через pip
 # ----------------------------------------------------------
 echo "[2/5] Установка BorgBackup..."
 pip3 install borgbackup
 
+echo ""
+echo "Версия BorgBackup:"
+borg -V
+
 # ----------------------------------------------------------
-# 3. Пользователь
+# 3. Пользователь borgbackup
 # ----------------------------------------------------------
-echo "[3/5] Создание пользователя borgbackup..."
+echo "[3/5] Создание пользователя..."
 useradd -m -s /bin/bash borgbackup 2>/dev/null || true
 echo "borgbackup:Backup123!" | chpasswd
 
@@ -48,6 +47,7 @@ chmod 750 /srv/borg
 mkdir -p /home/borgbackup/.ssh
 chmod 700 /home/borgbackup/.ssh
 chown borgbackup:borgbackup /home/borgbackup/.ssh
+
 systemctl enable --now sshd
 
 # ----------------------------------------------------------
@@ -64,4 +64,5 @@ echo "  ХРАНИЛИЩЕ SRV-BKP-01 ГОТОВО"
 echo "========================================="
 echo ""
 echo "Репозиторий: /srv/borg/repo"
+echo "Пользователь: borgbackup (Backup123!)"
 echo "Ключ: /root/borg-repokey.txt"

@@ -1,33 +1,31 @@
 #!/bin/bash
 # ============================================================
-# SRV-DC-01 — КОНТРОЛЛЕР ДОМЕНА
+# SRV-DC-01 — КОНТРОЛЛЕР ДОМЕНА (без Bind9)
 # ОС: ALT Server 10
 # IP: 10.0.10.10/24
 # Шлюз: 10.0.10.1
 # Домен: br67core.local
 # Пароль администратора: P@ssw0rd!
-# Роли: Samba AD DC, DNS, DHCP
 # ============================================================
 
 set -e
 
 echo "========================================="
 echo "  НАСТРОЙКА SRV-DC-01"
-echo "  Контроллер домена Samba AD DC"
 echo "  Домен: br67core.local"
 echo "========================================="
 
 # ----------------------------------------------------------
 # 1. Обновление и пакеты
 # ----------------------------------------------------------
-echo "[1/8] Обновление и установка пакетов..."
+echo "[1/7] Обновление и установка пакетов..."
 apt-get update && apt-get dist-upgrade -y
-apt-get install -y task-samba-dc bind dhcp-server chrony net-tools openssh-server
+apt-get install -y task-samba-dc dhcp-server chrony net-tools openssh-server
 
 # ----------------------------------------------------------
 # 2. Сеть
 # ----------------------------------------------------------
-echo "[2/8] Настройка сети..."
+echo "[2/7] Настройка сети..."
 mkdir -p /etc/net/ifaces/ens18
 
 cat > /etc/net/ifaces/ens18/options << 'EOF'
@@ -52,14 +50,14 @@ ping -c 2 10.0.10.1 && echo "GW-01 доступен" || echo "Нет связи 
 # ----------------------------------------------------------
 # 3. Синхронизация времени
 # ----------------------------------------------------------
-echo "[3/8] Настройка времени..."
+echo "[3/7] Настройка времени..."
 systemctl enable --now chronyd
 chronyc makestep
 
 # ----------------------------------------------------------
-# 4. Развёртывание контроллера домена
+# 4. Развёртывание домена (ВСТРОЕННЫЙ DNS SAMBA)
 # ----------------------------------------------------------
-echo "[4/8] Развёртывание Samba AD DC..."
+echo "[4/7] Развёртывание Samba AD DC..."
 
 rm -f /etc/samba/smb.conf
 rm -rf /var/lib/samba/private/*
@@ -70,51 +68,29 @@ samba-tool domain provision \
     --domain=BR67CORE \
     --adminpass='P@ssw0rd!' \
     --server-role=dc \
-    --dns-backend=BIND9_DLZ \
+    --dns-backend=SAMBA_INTERNAL \
     --host-name=srv-dc-01
 
 # ----------------------------------------------------------
-# 5. Настройка DNS (Bind9)
+# 5. Запуск Samba
 # ----------------------------------------------------------
-echo "[5/8] Настройка DNS (Bind9)..."
-
-cp /var/lib/samba/bind-dns/named.conf /etc/bind/named.conf.local
-
-cat >> /etc/bind/named.conf << 'EOF'
-include "/etc/bind/named.conf.local";
-EOF
-
-cat > /etc/bind/named.conf.options << 'EOF'
-options {
-    directory "/var/cache/bind";
-    forwarders {
-        8.8.8.8;
-        77.88.8.8;
-    };
-    allow-query { any; };
-    dnssec-validation no;
-    listen-on { any; };
-};
-EOF
-
-systemctl enable --now bind
-
-# ----------------------------------------------------------
-# 6. Запуск Samba и проверка
-# ----------------------------------------------------------
-echo "[6/8] Запуск Samba..."
+echo "[5/7] Запуск Samba..."
 
 systemctl enable --now samba
 systemctl enable --now krb5-kdc
+
+# Настройка forwarders для DNS
+samba-tool dns zoneoptions 127.0.0.1 --option=forwarder --value=8.8.8.8
+samba-tool dns zoneoptions 127.0.0.1 --option=forwarder --value=77.88.8.8
 
 echo ""
 echo "=== Проверка домена ==="
 samba-tool domain level show
 
 # ----------------------------------------------------------
-# 7. Настройка DHCP
+# 6. Настройка DHCP
 # ----------------------------------------------------------
-echo "[7/8] Настройка DHCP-сервера..."
+echo "[6/7] Настройка DHCP-сервера..."
 
 cat > /etc/dhcp/dhcpd.conf << 'EOF'
 default-lease-time 86400;
@@ -138,9 +114,9 @@ EOF
 systemctl enable --now dhcpd
 
 # ----------------------------------------------------------
-# 8. Тестовые пользователи
+# 7. Тестовые пользователи
 # ----------------------------------------------------------
-echo "[8/8] Создание тестовых пользователей..."
+echo "[7/7] Создание тестовых пользователей..."
 
 for user in user1 user2 admin; do
     samba-tool user create $user "Pass123!" --given-name=$user --surname=Test
@@ -155,12 +131,11 @@ echo "  НАСТРОЙКА SRV-DC-01 ЗАВЕРШЕНА"
 echo "========================================="
 echo ""
 echo "Домен: BR67CORE.LOCAL"
-echo "Пароль администратора домена: P@ssw0rd!"
-echo "Пользователи: user1, user2, admin (пароль: Pass123!)"
+echo "Пароль администратора: P@ssw0rd!"
+echo "Пользователи: user1, user2, admin (Pass123!)"
 echo ""
 echo "=== Статусы служб ==="
 echo "Samba:  $(systemctl is-active samba)"
-echo "Bind9:  $(systemctl is-active bind)"
 echo "DHCP:   $(systemctl is-active dhcpd)"
 echo "Chrony: $(systemctl is-active chronyd)"
 echo ""

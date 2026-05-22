@@ -6,7 +6,6 @@
 # Шлюз: 10.0.10.1
 # Домен: br67core.local
 # Пароль администратора: P@ssw0rd!
-# Роли: Samba AD DC (встроенный DNS), DHCP
 # ============================================================
 
 set -e
@@ -56,7 +55,7 @@ systemctl enable --now chronyd
 chronyc makestep
 
 # ----------------------------------------------------------
-# 4. Развёртывание домена (встроенный DNS Samba)
+# 4. Развёртывание домена
 # ----------------------------------------------------------
 echo "[4/7] Развёртывание Samba AD DC..."
 
@@ -77,21 +76,20 @@ samba-tool domain provision \
 # ----------------------------------------------------------
 echo "[5/7] Запуск Samba..."
 
-# Копируем конфиг в стандартное место
 cp /var/lib/samba/private/krb5.conf /etc/krb5.conf
 
 systemctl enable --now samba
 
-# Настройка DNS forwarders
-samba-tool dns zoneoptions 127.0.0.1 --option=forwarder --value=8.8.8.8
-samba-tool dns zoneoptions 127.0.0.1 --option=forwarder --value=77.88.8.8
+# DNS forwarders (исправленный синтаксис)
+samba-tool dns zoneoptions 127.0.0.1 br67core.local --option="forwarder=8.8.8.8"
+samba-tool dns zoneoptions 127.0.0.1 br67core.local --option="forwarder=77.88.8.8"
 
 echo ""
 echo "=== Проверка домена ==="
 samba-tool domain level show
 
 # ----------------------------------------------------------
-# 6. Настройка DHCP
+# 6. DHCP
 # ----------------------------------------------------------
 echo "[6/7] Настройка DHCP-сервера..."
 
@@ -117,7 +115,7 @@ EOF
 systemctl enable --now dhcpd
 
 # ----------------------------------------------------------
-# 7. Тестовые пользователи
+# 7. Пользователи
 # ----------------------------------------------------------
 echo "[7/7] Создание тестовых пользователей..."
 

@@ -4,6 +4,8 @@
 # ОС: ALT Linux 10
 # Интерфейсы: ens18 (WAN), ens19 (LAN — 10.0.0.1/24)
 # Роль: NAT, Firewall, DNS-кэш, DHCP Relay
+# Серверный сегмент: VLAN 10 (10.0.10.0/24)
+# Пользовательский сегмент: VLAN 20 (10.0.20.0/24)
 # ============================================================
 
 set -e
@@ -32,20 +34,18 @@ systemctl enable --now chronyd
 echo "[3/7] Настройка сетевого интерфейса ens19 (LAN)..."
 mkdir -p /etc/net/ifaces/ens19
 
-# Файл options (тип интерфейса, способ получения адреса)
 cat > /etc/net/ifaces/ens19/options << 'EOF'
 TYPE=eth
 BOOTPROTO=static
 ONBOOT=yes
 EOF
 
-# Файл ipv4address (сам IP-адрес и маска)
 cat > /etc/net/ifaces/ens19/ipv4address << 'EOF'
 10.0.0.1/24
 EOF
 
-# Внешний интерфейс ens18 остаётся как есть (DHCP)
 systemctl restart network
+
 # ----------------------------------------------------------
 # 4. Включение IP-форвардинга
 # ----------------------------------------------------------

@@ -17,20 +17,26 @@ apt-get update
 apt-get install -y python3-module-pkgconfig python3-module-setuptools \
     python3-module-wheel python3-module-msgpack libssl-devel python3-dev \
     libacl-devel libacl liblz4-devel libzstd-devel libxxhash-devel \
-    openssh-server
+    openssh-server python3-module-pip
 
 # ----------------------------------------------------------
-# 2. Установка BorgBackup через pip
+# 2. Установка BorgBackup
 # ----------------------------------------------------------
 echo "[2/5] Установка BorgBackup..."
-pip3 install borgbackup
+
+# Если pip3 не установился — через ensurepip
+if ! command -v pip3 &> /dev/null; then
+    python3 -m ensurepip --upgrade
+fi
+
+python3 -m pip install borgbackup
 
 echo ""
 echo "Версия BorgBackup:"
 borg -V
 
 # ----------------------------------------------------------
-# 3. Пользователь borgbackup
+# 3. Пользователь
 # ----------------------------------------------------------
 echo "[3/5] Создание пользователя..."
 useradd -m -s /bin/bash borgbackup 2>/dev/null || true
@@ -47,7 +53,6 @@ chmod 750 /srv/borg
 mkdir -p /home/borgbackup/.ssh
 chmod 700 /home/borgbackup/.ssh
 chown borgbackup:borgbackup /home/borgbackup/.ssh
-
 systemctl enable --now sshd
 
 # ----------------------------------------------------------
@@ -64,5 +69,4 @@ echo "  ХРАНИЛИЩЕ SRV-BKP-01 ГОТОВО"
 echo "========================================="
 echo ""
 echo "Репозиторий: /srv/borg/repo"
-echo "Пользователь: borgbackup (Backup123!)"
 echo "Ключ: /root/borg-repokey.txt"

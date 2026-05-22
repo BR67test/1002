@@ -1,0 +1,1 @@
+echo "=== Интерфейсы ===" && ip -br a && echo "" && echo "=== Маршруты ===" && ip route && echo "" && echo "=== Форвардинг ===" && sysctl net.ipv4.ip_forward && echo "" && echo "=== Статусы служб ===" && systemctl is-active dnsmasq dhcrelay chronyd iptables && echo "" && echo "=== Проверка интернета ===" && ping -c 2 8.8.8.8

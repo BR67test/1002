@@ -20,7 +20,7 @@ echo "========================================="
 # ----------------------------------------------------------
 echo "[1/7] Обновление системы и установка пакетов..."
 apt-get update && apt-get dist-upgrade -y
-apt-get install -y iptables net-tools openssh-server chrony tcpdump dnsmasq dhcp-relay
+apt-get install -y iptables net-tools openssh-server chrony tcpdump dnsmasq dhcp-server
 
 # ----------------------------------------------------------
 # 2. Синхронизация времени
@@ -139,16 +139,26 @@ EOF
 systemctl enable --now dnsmasq
 
 # ----------------------------------------------------------
-# 7. Настройка DHCP Relay
+# 7. Настройка DHCP Relay (dhcrelay)
 # ----------------------------------------------------------
 echo "[7/7] Настройка DHCP Relay..."
-cat > /etc/sysconfig/dhcp-relay << 'EOF'
-INTERFACES="ens19"
-DHCPSERVERS="10.0.10.10"
-OPTIONS="-q"
+
+cat > /etc/systemd/system/dhcrelay.service << 'EOF'
+[Unit]
+Description=DHCP Relay Agent (dhcrelay)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/dhcrelay -q -i ens19 10.0.10.10
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
 EOF
 
-systemctl enable --now dhcp-relay
+systemctl daemon-reload
+systemctl enable --now dhcrelay
 
 # ----------------------------------------------------------
 # Финал
@@ -170,8 +180,8 @@ echo ""
 echo "Статус dnsmasq:"
 systemctl is-active dnsmasq
 echo ""
-echo "Статус dhcp-relay:"
-systemctl is-active dhcp-relay
+echo "Статус dhcrelay:"
+systemctl is-active dhcrelay
 echo ""
 echo "Проверка связи с интернетом:"
 ping -c 4 8.8.8.8 || echo "ВНИМАНИЕ: Интернет недоступен, проверьте ens18"

@@ -1,0 +1,1 @@
+echo "=== OVS ===" && ovs-vsctl show && echo "" && echo "=== ИНТЕРФЕЙСЫ ===" && ip -br a | grep -E "ens19|ens20|ens21|mgmt|SW-BR0" && echo "" && echo "=== МАРШРУТЫ ===" && ip route && echo "" && echo "=== ПИНГ GW-01 ===" && ping -c 2 10.0.0.1

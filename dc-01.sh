@@ -1,11 +1,12 @@
 #!/bin/bash
 # ============================================================
-# SRV-DC-01 — КОНТРОЛЛЕР ДОМЕНА (без Bind9)
+# SRV-DC-01 — КОНТРОЛЛЕР ДОМЕНА
 # ОС: ALT Server 10
 # IP: 10.0.10.10/24
 # Шлюз: 10.0.10.1
 # Домен: br67core.local
 # Пароль администратора: P@ssw0rd!
+# Роли: Samba AD DC (встроенный DNS), DHCP
 # ============================================================
 
 set -e
@@ -55,7 +56,7 @@ systemctl enable --now chronyd
 chronyc makestep
 
 # ----------------------------------------------------------
-# 4. Развёртывание домена (ВСТРОЕННЫЙ DNS SAMBA)
+# 4. Развёртывание домена (встроенный DNS Samba)
 # ----------------------------------------------------------
 echo "[4/7] Развёртывание Samba AD DC..."
 
@@ -76,10 +77,12 @@ samba-tool domain provision \
 # ----------------------------------------------------------
 echo "[5/7] Запуск Samba..."
 
-systemctl enable --now samba
-systemctl enable --now krb5-kdc
+# Копируем конфиг в стандартное место
+cp /var/lib/samba/private/krb5.conf /etc/krb5.conf
 
-# Настройка forwarders для DNS
+systemctl enable --now samba
+
+# Настройка DNS forwarders
 samba-tool dns zoneoptions 127.0.0.1 --option=forwarder --value=8.8.8.8
 samba-tool dns zoneoptions 127.0.0.1 --option=forwarder --value=77.88.8.8
 
